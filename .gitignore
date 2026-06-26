@@ -2,3 +2,7 @@ data/
 *.csv
 *.parquet
 *.pkl
+encodings/
+*.pkl
+models/
+*.pkl
