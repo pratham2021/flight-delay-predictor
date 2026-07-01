@@ -110,8 +110,15 @@ with col2:
 col1, col2, col3 = st.columns([1, 2, 1])
 
 with col2:
+    
     hour_min_value = datetime.datetime.now().hour if departure_date and departure_date == datetime.date.today() else 0
-    departure_hour = st.slider("Departure Hour", min_value=hour_min_value, max_value=23, value=hour_min_value, step=1)
+    
+    if departure_date and departure_date == datetime.date.today() and datetime.datetime.now().hour == 23:
+        departure_hour = 23
+        st.write("Departure Hour: 23 (Last hour of today)")
+    else:
+        departure_hour = st.slider("Departure Hour", min_value=hour_min_value, max_value=23, value=hour_min_value, step=1)
+    
     distance = st.slider("Distance (Miles)", min_value=31.0, max_value=5100.0, value=0.0, step=1.0)
     scheduled_duration = st.slider("Duration (Minutes)", min_value=9.0, max_value=701.0, value = 120.0, step=1.0)
     
