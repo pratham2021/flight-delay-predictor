@@ -4,3 +4,4 @@ numpy
 joblib
 lightgbm
 requests
+scikit-learn
