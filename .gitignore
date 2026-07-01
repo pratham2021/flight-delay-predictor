@@ -6,5 +6,3 @@ encodings/
 *.pkl
 models/
 *.pkl
-airports/
-*.csv
