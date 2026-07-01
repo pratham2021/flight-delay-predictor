@@ -4,5 +4,3 @@ data/
 *.pkl
 encodings/
 *.pkl
-models/
-*.pkl
