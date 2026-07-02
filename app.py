@@ -18,6 +18,8 @@ airports = pd.read_csv('airports/airports.csv')
 airports = airports.dropna(subset=['iata_code'])
 airports = airports[airports['iata_code'] != 'None']
 
+
+
 def isHolidayPeriod(date):
     if date.month == 1 and 15 <= date.day <= 20:
         return 1
@@ -36,6 +38,15 @@ def isHolidayPeriod(date):
     if (date.month == 12 and date.day >= 20) or (date.month == 1 and date.day <= 5):
         return 1
     return 0
+
+@st.cache_data
+def get_cleaned_airports():
+    df = pd.read_csv("airports/airports.csv")
+    df = df.dropna(subset=["iata_code"])
+    df = df[df["iata_code"] != "None"]
+    return df
+
+airports = get_cleaned_airports()
 
 @st.cache_resource
 def load_items():
