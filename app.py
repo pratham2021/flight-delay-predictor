@@ -159,6 +159,11 @@ with center_col:
         if departure_date == datetime.date.today() and departure_hour < current_local_hour:
             st.warning("Please select a current or future departure hour!")
             st.stop()
+        
+        local_dt = datetime.datetime(departure_date.year, departure_date.month, departure_date.day, departure_hour)
+        local_dt_aware = local_tz.localize(local_dt)
+        utc_dt = local_dt_aware.astimezone(pytz.utc)
+        utc_hour = utc_dt.hour
             
         latitude = airports[airports['iata_code'] == origin]['latitude_deg'].values[0]
         longitude = airports[airports['iata_code'] == origin]['longitude_deg'].values[0]
@@ -185,14 +190,14 @@ with center_col:
         response = requests.get(url, timeout=30).json()
         hourly = response['hourly']
         
-        precipitation = hourly['precipitation'][departure_hour]
-        rain = hourly['rain'][departure_hour]
-        snowfall = hourly['snowfall'][departure_hour]
-        wind_speed = hourly['wind_speed_10m'][departure_hour]
-        wind_gusts = hourly['wind_gusts_10m'][departure_hour]
-        temperature = hourly['temperature_2m'][departure_hour]
-        weather_code = hourly['weather_code'][departure_hour]
-        cloud_cover_low = hourly['cloud_cover_low'][departure_hour]
+        precipitation = hourly['precipitation'][utc_hour]
+        rain = hourly['rain'][utc_hour]
+        snowfall = hourly['snowfall'][utc_hour]
+        wind_speed = hourly['wind_speed_10m'][utc_hour]
+        wind_gusts = hourly['wind_gusts_10m'][utc_hour]
+        temperature = hourly['temperature_2m'][utc_hour]
+        weather_code = hourly['weather_code'][utc_hour]
+        cloud_cover_low = hourly['cloud_cover_low'][utc_hour]
         
         MONTH = departure_date.month
         DAY_OF_WEEK = departure_date.weekday()
