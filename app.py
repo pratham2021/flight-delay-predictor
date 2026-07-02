@@ -132,7 +132,10 @@ with col2:
     local_tz = pytz.timezone(timezone_str)
     current_local_hour = datetime.datetime.now(local_tz).hour
     
-    departure_hour = st.slider("Departure Hour", min_value=0, max_value=23, value=current_local_hour, step=1)
+    if departure_date != datetime.datetime.today():
+        departure_hour = st.slider("Departure Hour", min_value=0, max_value=23, value=current_local_hour, step=1)
+    else:
+        departure_hour = st.slider("Departure Hour", min_value=current_local_hour, max_value=23, value=current_local_hour, step=1)
     
     distance = st.slider("Distance (Miles)", min_value=31.0, max_value=5100.0, value=0.0, step=1.0)
     scheduled_duration = st.slider("Duration (Minutes)", min_value=9.0, max_value=701.0, value = 120.0, step=1.0)
@@ -180,7 +183,6 @@ with center_col:
         )
         
         response = requests.get(url, timeout=30).json()
-        print(response)
         hourly = response['hourly']
         
         precipitation = hourly['precipitation'][departure_hour]
