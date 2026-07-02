@@ -5,6 +5,8 @@ import joblib
 import lightgbm as lgbm
 import datetime
 import requests
+import pytz
+from timezonefinder import TimezoneFinder
 
 hide_streamlit_style = """
     <style>
@@ -122,13 +124,15 @@ col1, col2, col3 = st.columns([1, 2, 1])
 
 with col2:
     
-    hour_min_value = datetime.datetime.now().hour if departure_date and departure_date == datetime.date.today() else 0
+    lat = airports[airports['iata_code'] == origin]['latitude_deg'].values[0]
+    long = airports[airports['iata_code'] == origin]['longitude_deg'].values[0]
+
+    tf = TimezoneFinder()
+    timezone_str = tf.timezone_at(lat=lat, lng=long)
+    local_tz = pytz.timezone(timezone_str)
+    current_local_hour = datetime.datetime.now(local_tz).hour
     
-    if departure_date and departure_date == datetime.date.today() and datetime.datetime.now().hour == 23:
-        departure_hour = 23
-        st.write("Departure Hour: 23 (Last hour of today)")
-    else:
-        departure_hour = st.slider("Departure Hour", min_value=hour_min_value, max_value=23, value=hour_min_value, step=1)
+    departure_hour = st.slider("Departure Hour", min_value=0, max_value=23, value=current_local_hour, step=1)
     
     distance = st.slider("Distance (Miles)", min_value=31.0, max_value=5100.0, value=0.0, step=1.0)
     scheduled_duration = st.slider("Duration (Minutes)", min_value=9.0, max_value=701.0, value = 120.0, step=1.0)
@@ -140,17 +144,21 @@ _, center_col, _ = st.columns([1, 2, 1])
 with center_col:
     if st.button("Predict", use_container_width=True):
         if not origin:
-            st.error("You must enter an origin airport.")
-        if not departure_date:
-            st.error("You must enter a departure date.")
+            st.error("You must enter an origin airport!")
+            st.stop()
         if not destination:
-            st.error("You must enter a destination airport.")
-        if not airline:
-            st.error("You must enter an airline.")
+            st.error("You must enter a destination airport!")
+            st.stop()
+        if not airline:    
+            st.error("You must enter an airline!")
+            st.stop()
+        
+        if departure_date == datetime.date.today() and departure_hour < current_local_hour:
+            st.warning("Please select a current or future departure hour!")
+            st.stop()
             
-        airport_row = airports[airports['iata_code'] == origin].iloc[0]
-        latitude = airport_row['latitude_deg']
-        longitude = airport_row['longitude_deg']
+        latitude = airports[airports['iata_code'] == origin]['latitude_deg'].values[0]
+        longitude = airports[airports['iata_code'] == origin]['longitude_deg'].values[0]
         
         today = datetime.date.today()
         departure_date_str = departure_date.strftime('%Y-%m-%d')

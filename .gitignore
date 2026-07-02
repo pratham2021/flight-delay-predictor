@@ -2,3 +2,4 @@ data/
 *.csv
 *.parquet
 *.pkl
+.DS_Store
