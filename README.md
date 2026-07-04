@@ -12,6 +12,7 @@ Live Demo Link: https://us-flight-delay.streamlit.app/
 I gathered 16 months' worth of flight data from January 2025 to April 2026, totalling over 9 million flights.
 I also gathered data about airport metadata like coordinates, name, iso_region for each one of the unique origin airports in the 9 million flight records.
 This facilitated the process to look up the weather metrics based on origin airport latitude and longitude, the departure date, and the local time
+
 BTS On-Time: Reporting Carrier On-Time Performance (1987-present) https://www.transtats.bts.gov/DL_SelectFields.aspx?gnoyr_VQ=FGJ&QO_fu146_anzr=b0-gvzr
 Airports CSV File https://ourairports.com/data/
 Open-Meteo Weather API: https://open-meteo.com/en/docs/historical-weather-api
