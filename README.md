@@ -14,16 +14,23 @@ I also gathered data about airport metadata like coordinates, name, iso_region f
 This facilitated the process to look up the weather metrics based on origin airport latitude and longitude, the departure date, and the local time
 
 BTS On-Time: Reporting Carrier On-Time Performance (1987-present) https://www.transtats.bts.gov/DL_SelectFields.aspx?gnoyr_VQ=FGJ&QO_fu146_anzr=b0-gvzr
+
 Airports CSV File https://ourairports.com/data/
+
 Open-Meteo Weather API: https://open-meteo.com/en/docs/historical-weather-api
 
 ## 3. Features Engineered
 
 date: DEPARTURE_HOUR, DAY_OF_WEEK, MONTH, IS_HOLIDAY_PERIOD, 'CRS_ELAPSED_TIME'
+
 weather: wind_gusts, precipitation, cloud_cover_low, weather_code, rain, temperature, wind_speed, snowfall
+
 distance: DISTANCE
+
 congestion: ORIGIN_HOURLY_FLIGHTS, DEST_HOURLY_FLIGHTS, ROUTE_HOURLY_FLIGHTS
+
 delay rate: CARRIER_DELAY_RATE, ORIGIN_DELAY_RATE, ROUTE_DELAY_RATE, DEST_DELAY_RATE
+
 encodings: ORIGIN_ENCODED, DEST_ENCODED, ROUTE_ENCODED, ORIGIN_STATE_ABR, DEST_STATE_ABR, OP_UNIQUE_CARRIER
 
 Any information related to origin, destination, and route are key pieces of information to be passed off to the machine learning model to make a prediction.
