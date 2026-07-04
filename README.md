@@ -41,14 +41,20 @@ delay rate: CARRIER_DELAY_RATE, ORIGIN_DELAY_RATE, ROUTE_DELAY_RATE, DEST_DELAY_
 encodings: ORIGIN_ENCODED, DEST_ENCODED, ROUTE_ENCODED, ORIGIN_STATE_ABR, DEST_STATE_ABR, OP_UNIQUE_CARRIER
 
 Any information related to origin, destination, and route are key pieces of information to be passed off to the machine learning model to make a prediction.
-Machine learning model don't understand plain text, but they do understand numbers. I assigned numerical categories for each origin, destination, and route, and carrier using the respective TargetEncoders
+
+Machine learning model don't understand plain text, but they do understand numbers. 
+
+I assigned numerical categories for each origin, destination, and route, and carrier using the respective TargetEncoders
 
 Information related to airline, the origin state, and destination state were assigned numerical categories with respective LabelEncoders with respective LabelEcnoders.
 
-Information related how many flights are departing from the origin at a given departure hour, how many flights operated on that route in that hour, and how many flights are at the destination at that hour
-are also important factors when making a prediction. These didn't require any TargetEncoders. I grouped together the FL_DATE, DEPARTURE_HOUR, ORIGIN/ROUTE/DEST columns for each ORIGIN/ROUTE/DEST and got the respective counts for each column (ORIGIN_HOURLY_FLIGHT, ROUTE_HOURLY_FLIGHTS, DEST_HOURLY_FLIGHTS).
+Information related how many flights are departing from the origin at a given departure hour, how many flights operated on that route in that hour, and how many flights are at the destination at that hour are also important factors when making a prediction.
 
-Historical information regarding airline delay reputation, airport delay reputation, and route delay reputation is also important to look at. I grouped together the OP_UNIQUE_CARRIER, ORIGIN, DEST, ROUTE columns the figure out the delay rate based on airline, origin airport, destination airport, and route, respectively and create new corresponding columns as such where the ORIGIN, DEST, ROUTE columns was mapped to its respective delay rate.
+I grouped together the FL_DATE, DEPARTURE_HOUR, ORIGIN/ROUTE/DEST columns for each ORIGIN/ROUTE/DEST and got the respective counts for each column (ORIGIN_HOURLY_FLIGHT, ROUTE_HOURLY_FLIGHTS, DEST_HOURLY_FLIGHTS).
+
+Historical information regarding airline delay reputation, airport delay reputation, and route delay reputation is also important to look at. 
+
+I grouped together the OP_UNIQUE_CARRIER, ORIGIN, DEST, ROUTE columns the figure out the delay rate based on airline, origin airport, destination airport, and route, respectively and create new corresponding columns as such where the ORIGIN, DEST, ROUTE columns was mapped to its respective delay rate.
 
 # 4. Model
 
