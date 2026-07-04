@@ -1,16 +1,23 @@
 ## 1. Project Overview
 
 The app predicts a probability of flight delay based on 7 key pieces of information that the user has to enter.
+
 Select your origin, destination, departure date, and airline from the four respective dropdowns.
+
 Use the sliders to tell the app to enter the hour (in accordance to the origin airport) of your scheduled departure, how many miles you'll be flying, and the scheduled flight duration.
+
 Once the user hits the Predict button the app takes care of the rest, by pinging the Open-Meteo API to get information on what the weather conditions at the origin airport are and consolidates all other user inputted data to pass off to the model in order to make a prediction!
+
 Live Demo Link: https://us-flight-delay.streamlit.app/
+
 ![alt text](app_screenshot.png)
 
 ## 2. Dataset
 
 I gathered 16 months' worth of flight data from January 2025 to April 2026, totalling over 9 million flights.
+
 I also gathered data about airport metadata like coordinates, name, iso_region for each one of the unique origin airports in the 9 million flight records.
+
 This facilitated the process to look up the weather metrics based on origin airport latitude and longitude, the departure date, and the local time
 
 BTS On-Time: Reporting Carrier On-Time Performance (1987-present) https://www.transtats.bts.gov/DL_SelectFields.aspx?gnoyr_VQ=FGJ&QO_fu146_anzr=b0-gvzr
@@ -51,6 +58,9 @@ Metrics: 74.6% AUC-ROC, 80% accuracy, 66.3% FNR and 7% FPR
 # 5. Future Improvements
 
 Access to more months worth of flight data
+
 Air Traffic Controller data corresponding to each one of the over 9 million flights in the dataset
+
 Feature engineering how many flights are scheduled to land at the destination airport when the current flight is scheduled to land
+
 CatBoost ensemble algorithm
