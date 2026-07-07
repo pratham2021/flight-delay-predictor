@@ -52,6 +52,7 @@ airports = get_cleaned_airports()
 
 @st.cache_resource
 def load_items():
+    tf = TimezoneFinder()
     model = joblib.load('models/best_model.pkl')
     
     le_carrier = joblib.load('encodings/le_carrier.pkl')
@@ -72,9 +73,9 @@ def load_items():
     route_delay_map = joblib.load('encodings/route_delay_map.pkl')    
     best_threshold = joblib.load('models/best_threshold.pkl')
     
-    return model, le_carrier, le_origin_state, le_dest_state, origin_te, dest_te, route_te, origin_hourly_avg, dest_hourly_avg, route_hourly_avg, carrier_delay_map, origin_delay_map, dest_delay_map, route_delay_map, best_threshold
+    return model, le_carrier, le_origin_state, le_dest_state, origin_te, dest_te, route_te, origin_hourly_avg, dest_hourly_avg, route_hourly_avg, carrier_delay_map, origin_delay_map, dest_delay_map, route_delay_map, best_threshold, tf
 
-model, le_carrier, le_origin_state, le_dest_state, origin_te, dest_te, route_te, origin_hourly_avg, dest_hourly_avg, route_hourly_avg, carrier_delay_map, origin_delay_map, dest_delay_map, route_delay_map, best_threshold = load_items()
+model, le_carrier, le_origin_state, le_dest_state, origin_te, dest_te, route_te, origin_hourly_avg, dest_hourly_avg, route_hourly_avg, carrier_delay_map, origin_delay_map, dest_delay_map, route_delay_map, best_threshold, tf = load_items()
 
 st.markdown("<h1 style='text-align: center;'>US Flight Delay Predictor</h1>", unsafe_allow_html=True)
 st.markdown("<h3 style='text-align: center;'>Will your flight be delayed?</h3>", unsafe_allow_html=True)
@@ -128,7 +129,6 @@ with col2:
     lat = airports[airports['iata_code'] == origin]['latitude_deg'].values[0]
     long = airports[airports['iata_code'] == origin]['longitude_deg'].values[0]
 
-    tf = TimezoneFinder()
     timezone_str = tf.timezone_at(lat=lat, lng=long)
     local_tz = pytz.timezone(timezone_str)
     current_local_hour = datetime.datetime.now(local_tz).hour
