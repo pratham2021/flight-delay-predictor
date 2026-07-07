@@ -69,11 +69,12 @@ def load_items():
     carrier_delay_map = joblib.load('encodings/carrier_delay_map.pkl')
     origin_delay_map = joblib.load('encodings/origin_delay_map.pkl')
     dest_delay_map = joblib.load('encodings/dest_delay_map.pkl')
-    route_delay_map = joblib.load('encodings/route_delay_map.pkl')
+    route_delay_map = joblib.load('encodings/route_delay_map.pkl')    
+    best_threshold = joblib.load('models/best_threshold.pkl')
     
-    return model, le_carrier, le_origin_state, le_dest_state, origin_te, dest_te, route_te, origin_hourly_avg, dest_hourly_avg, route_hourly_avg, carrier_delay_map, origin_delay_map, dest_delay_map, route_delay_map
+    return model, le_carrier, le_origin_state, le_dest_state, origin_te, dest_te, route_te, origin_hourly_avg, dest_hourly_avg, route_hourly_avg, carrier_delay_map, origin_delay_map, dest_delay_map, route_delay_map, best_threshold
 
-model, le_carrier, le_origin_state, le_dest_state, origin_te, dest_te, route_te, origin_hourly_avg, dest_hourly_avg, route_hourly_avg, carrier_delay_map, origin_delay_map, dest_delay_map, route_delay_map = load_items()
+model, le_carrier, le_origin_state, le_dest_state, origin_te, dest_te, route_te, origin_hourly_avg, dest_hourly_avg, route_hourly_avg, carrier_delay_map, origin_delay_map, dest_delay_map, route_delay_map, best_threshold = load_items()
 
 st.markdown("<h1 style='text-align: center;'>US Flight Delay Predictor</h1>", unsafe_allow_html=True)
 st.markdown("<h3 style='text-align: center;'>Will your flight be delayed?</h3>", unsafe_allow_html=True)
@@ -223,8 +224,6 @@ with center_col:
         origin_encoded = origin_te.transform([[origin]])[0][0]
         dest_encoded = dest_te.transform([[destination]])[0][0]
         route_encoded = route_te.transform([[route]])[0][0]
-        
-        best_threshold = joblib.load('models/best_threshold.pkl')
         
         feature_vector = pd.DataFrame({
             'DEPARTURE_HOUR': [departure_hour],
