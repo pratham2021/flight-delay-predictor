@@ -188,7 +188,15 @@ with center_col:
             f"rain,wind_gusts_10m,weather_code,cloud_cover_low"
         )
         
-        response = requests.get(url, timeout=30).json()
+        for attempt in range(3):
+            try:
+                response = requests.get(url, timeout=60).json()
+                break
+            except requests.exceptions.ReadTimeout:
+                if attempt == 2:
+                    st.error("Weather fetch timed out. Please try again.")
+                    st.stop()
+                
         hourly = response['hourly']
         
         precipitation = hourly['precipitation'][utc_hour]
