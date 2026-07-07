@@ -43,10 +43,10 @@ def isHolidayPeriod(date):
 
 @st.cache_data
 def get_cleaned_airports():
-    df = pd.read_csv("airports/airports.csv")
-    df = df.dropna(subset=["iata_code"])
-    df = df[df["iata_code"] != "None"]
-    return df
+    airports = pd.read_csv("airports/airports.csv")
+    airports = airports.dropna(subset=["iata_code"])
+    airports = airports[airports["iata_code"] != "None"]
+    return airports
 
 airports = get_cleaned_airports()
 
@@ -132,7 +132,7 @@ with col2:
     local_tz = pytz.timezone(timezone_str)
     current_local_hour = datetime.datetime.now(local_tz).hour
     
-    if departure_date != datetime.datetime.today():
+    if departure_date != datetime.date.today():
         departure_hour = st.slider("Departure Hour", min_value=0, max_value=23, value=current_local_hour, step=1)
     else:
         departure_hour = st.slider("Departure Hour", min_value=current_local_hour, max_value=23, value=current_local_hour, step=1)
@@ -208,7 +208,7 @@ with center_col:
         
         airline_encoded = le_carrier.transform([airline])[0]
         origin_state_encoded = le_origin_state.transform([origin_state_abr])[0]
-        dest_state_encoded = le_dest_state.transform([origin_state_abr])[0]
+        dest_state_encoded = le_dest_state.transform([dest_state_abr])[0]
         
         route = f"{origin}-{destination}"
         origin_hourly_flights = origin_hourly_avg.get((origin, departure_hour), 0)
