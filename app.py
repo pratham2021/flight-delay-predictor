@@ -56,6 +56,18 @@ def get_sorted_airport_codes():
 
 airport_codes = get_sorted_airport_codes()
 
+@st.cache_data
+def get_airport_display_names():
+    return {row['iata_code']: f"{row['iata_code']} - {row['name']}" for _, row in airports.iterrows()}
+
+airport_names = get_airport_display_names()
+
+@st.cache_data
+def get_airport_timezone(iata_code):
+    row = airports[airports['iata_code'] == iata_code].iloc[0]
+    timezone_str = tf.timezone_at(lat=row['latitude_deg'], lng=row['longitude_deg'])
+    return timezone_str, row['latitude_deg'], row['longitude_deg']
+
 @st.cache_resource
 def load_items():
     tf = TimezoneFinder()
@@ -109,8 +121,8 @@ with col1:
     origin = st.selectbox(
         "Origin",
         options=airport_codes,
-        index=airport_codes.index('AUS'),    
-        format_func=lambda x: f"{x} - {airports[airports['iata_code'] == x]['name'].values[0]}"        
+        index=airport_codes.index('AUS'),  
+        format_func=lambda x: airport_names.get(x, x)
     )
     departure_date = st.date_input("Departure Date", min_value=datetime.date.today(), value=datetime.date.today())
 
@@ -119,7 +131,7 @@ with col2:
         "Destination",
         options=airport_codes,
         index=airport_codes.index('SLC'),
-        format_func=lambda x: f"{x} - {airports[airports['iata_code'] == x]['name'].values[0]}"        
+        format_func=lambda x: airport_names.get(x, x)
     )
     airline = st.selectbox(
         "Airline",
@@ -131,11 +143,7 @@ with col2:
 col1, col2, col3 = st.columns([1, 2, 1])
 
 with col2:
-    
-    lat = airports[airports['iata_code'] == origin]['latitude_deg'].values[0]
-    long = airports[airports['iata_code'] == origin]['longitude_deg'].values[0]
-
-    timezone_str = tf.timezone_at(lat=lat, lng=long)
+    timezone_str, lat, long = get_airport_timezone(origin)
     local_tz = pytz.timezone(timezone_str)
     current_local_hour = datetime.datetime.now(local_tz).hour
     

@@ -4,6 +4,6 @@ numpy
 joblib
 lightgbm
 requests
-scikit-learn
+scikit-learn==1.7.2
 pytz
 timezonefinder
