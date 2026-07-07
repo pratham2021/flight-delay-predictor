@@ -50,6 +50,12 @@ def get_cleaned_airports():
 
 airports = get_cleaned_airports()
 
+@st.cache_data
+def get_sorted_airport_codes():
+    return sorted(airports['iata_code'].tolist())
+
+airport_codes = get_sorted_airport_codes()
+
 @st.cache_resource
 def load_items():
     tf = TimezoneFinder()
@@ -102,8 +108,8 @@ col1, col2 = st.columns([1, 1])
 with col1:
     origin = st.selectbox(
         "Origin",
-        options=sorted(airports['iata_code'].tolist()),
-        index=sorted(airports['iata_code'].tolist()).index('AUS'),    
+        options=airport_codes,
+        index=airport_codes.index('AUS'),    
         format_func=lambda x: f"{x} - {airports[airports['iata_code'] == x]['name'].values[0]}"        
     )
     departure_date = st.date_input("Departure Date", min_value=datetime.date.today(), value=datetime.date.today())
@@ -111,8 +117,8 @@ with col1:
 with col2:    
     destination = st.selectbox(
         "Destination",
-        options=sorted(airports['iata_code'].tolist()),
-        index=sorted(airports['iata_code'].tolist()).index('SLC'),
+        options=airport_codes,
+        index=airport_codes.index('SLC'),
         format_func=lambda x: f"{x} - {airports[airports['iata_code'] == x]['name'].values[0]}"        
     )
     airline = st.selectbox(
