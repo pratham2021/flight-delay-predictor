@@ -62,7 +62,9 @@ I grouped together the OP_UNIQUE_CARRIER, ORIGIN, DEST, ROUTE columns the figure
 
 I used my validation set on the LightGBM model. I used Optuna to tune model hyperparameters and optimized for the highest F0.5 score
 
-Metrics: 74.6% AUC-ROC, 80% accuracy, 66.3% FNR and 7% FPR
+Metrics: 74.6% AUC-ROC, 80% accuracy, 66.3% FNR and 7% FPR.
+
+Having a higher false negative rate than a false positive rate is a design choice that I made as I don't want users to be missing on-time flights thinking that they are delayed.
 
 # 5. Future Improvements
 
@@ -73,3 +75,10 @@ Air Traffic Controller data corresponding to each one of the over 9 million flig
 Feature engineering how many flights are scheduled to land at the destination airport when the current flight is scheduled to land
 
 CatBoost ensemble algorithm
+
+## 6. Data Sources
+
+- BTS On-Time Performance data (public domain, U.S. Dept. of Transportation)
+- Airport metadata: OurAirports (public domain)
+- Historical weather: Open-Meteo (CC BY 4.0 — attribution required)
+- Live flight schedules: AeroDataBox (free tier, subject to their Terms of Service)
