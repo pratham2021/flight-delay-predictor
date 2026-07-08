@@ -62,7 +62,7 @@ def build_time_window(date_str, local_hour, window_hours=1):
 def find_matching_flight(departures_response, destination_iata, airline_name):
     for flight in departures_response.get("departures", []):
         arr_iata = flight.get("arrival", {}).get("airport", {}).get("iata")
-        airline = flight.get("airline", {}).get("name", "")
+        airline = flight.get("airline", {}).get("iata", "")
         if arr_iata == destination_iata and airline_name.lower() in airline.lower():
             return flight
     return None
