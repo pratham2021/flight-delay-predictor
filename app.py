@@ -220,8 +220,6 @@ def extract_duration_from_match(match):
         print(f"Could not extract duration: {e}")
         return None
 
-duration_reg = joblib.load('../models/duration_regressor.pkl')
-
 def estimate_duration_from_distance(distance_miles):
     return int(duration_reg.predict([[distance_miles]])[0])
 
