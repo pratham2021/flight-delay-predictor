@@ -8,6 +8,7 @@ import requests
 import pytz
 from timezonefinder import TimezoneFinder
 from math import radians, sin, cos, sqrt, atan2
+from datetime import timedelta
 
 hide_streamlit_style = """
     <style>
@@ -16,12 +17,6 @@ hide_streamlit_style = """
     </style>
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
-
-airports = pd.read_csv('airports/airports.csv')
-airports = airports.dropna(subset=['iata_code'])
-airports = airports[airports['iata_code'] != 'None']
-
-
 
 def isHolidayPeriod(date):
     if date.month == 1 and 15 <= date.day <= 20:
@@ -41,6 +36,40 @@ def isHolidayPeriod(date):
     if (date.month == 12 and date.day >= 20) or (date.month == 1 and date.day <= 5):
         return 1
     return 0
+
+def get_departures(origin_iata, from_time, to_time, api_key):
+    url = f"https://aerodatabox.p.rapidapi.com/flights/airports/iata/{origin_iata}/{from_time}/{to_time}"
+    headers = {
+        "x-rapidapi-key": api_key,
+        "x-rapidapi-host": "aerodatabox.p.rapidapi.com"
+    }
+    params = {
+        "withLeg": "true",
+        "direction": "Departure",
+        "withCancelled": "true",
+        "withCodeshared": "true"
+    }
+    resp = requests.get(url, headers=headers, params=params, timeout=10)
+    resp.raise_for_status()
+    return resp.json()
+
+def build_time_window(date_str, local_hour, window_hours=1):
+    base = datetime.datetime.strptime(f"{date_str} {local_hour}:00", "%Y-%m-%d %H:%M")
+    start = base - timedelta(hours=window_hours)
+    end = base + timedelta(hours=window_hours)
+    return start.strftime("%Y-%m-%dT%H:%M"), end.strftime("%Y-%m-%dT%H:%M")
+
+def find_matching_flight(departures_response, destination_iata, airline_name):
+    for flight in departures_response.get("departures", []):
+        arr_iata = flight.get("arrival", {}).get("airport", {}).get("iata")
+        airline = flight.get("airline", {}).get("name", "")
+        if arr_iata == destination_iata and airline_name.lower() in airline.lower():
+            return flight
+    return None
+
+@st.cache_data(ttl=3600) # cache for 1 hour
+def cached_get_departures(origin_iata, from_time, to_time, api_key):
+    return get_departures(origin_iata, from_time, to_time, api_key)
 
 @st.cache_data
 def get_cleaned_airports():
@@ -64,9 +93,9 @@ def get_airport_display_names():
 airport_names = get_airport_display_names()
 
 @st.cache_data
-def get_airport_timezone(iata_code):
+def get_airport_timezone(iata_code, timeZoneFinder):
     row = airports[airports['iata_code'] == iata_code].iloc[0]
-    timezone_str = tf.timezone_at(lat=row['latitude_deg'], lng=row['longitude_deg'])
+    timezone_str = timeZoneFinder.timezone_at(lat=row['latitude_deg'], lng=row['longitude_deg'])
     return timezone_str, row['latitude_deg'], row['longitude_deg']
 
 @st.cache_resource
@@ -92,9 +121,11 @@ def load_items():
     route_delay_map = joblib.load('encodings/route_delay_map.pkl')    
     best_threshold = joblib.load('models/best_threshold.pkl')
     
-    return model, le_carrier, le_origin_state, le_dest_state, origin_te, dest_te, route_te, origin_hourly_avg, dest_hourly_avg, route_hourly_avg, carrier_delay_map, origin_delay_map, dest_delay_map, route_delay_map, best_threshold, tf
+    duration_reg = joblib.load('models/duration_regressor.pkl')
+    
+    return model, duration_reg, le_carrier, le_origin_state, le_dest_state, origin_te, dest_te, route_te, origin_hourly_avg, dest_hourly_avg, route_hourly_avg, carrier_delay_map, origin_delay_map, dest_delay_map, route_delay_map, best_threshold, tf
 
-model, le_carrier, le_origin_state, le_dest_state, origin_te, dest_te, route_te, origin_hourly_avg, dest_hourly_avg, route_hourly_avg, carrier_delay_map, origin_delay_map, dest_delay_map, route_delay_map, best_threshold, tf = load_items()
+model, duration_reg, le_carrier, le_origin_state, le_dest_state, origin_te, dest_te, route_te, origin_hourly_avg, dest_hourly_avg, route_hourly_avg, carrier_delay_map, origin_delay_map, dest_delay_map, route_delay_map, best_threshold, tf = load_items()
 
 st.markdown("<h1 style='text-align: center;'>US Flight Delay Predictor</h1>", unsafe_allow_html=True)
 st.markdown("<h3 style='text-align: center;'>Will your flight be delayed?</h3>", unsafe_allow_html=True)
@@ -144,7 +175,7 @@ with col2:
 col1, col2, col3 = st.columns([1, 2, 1])
 
 with col2:
-    timezone_str, lat, long = get_airport_timezone(origin)
+    timezone_str, lat, long = get_airport_timezone(origin, tf)
     local_tz = pytz.timezone(timezone_str)
     current_local_hour = datetime.datetime.now(local_tz).hour
     
@@ -153,7 +184,6 @@ with col2:
     else:
         departure_hour = st.slider("Departure Hour", min_value=current_local_hour, max_value=23, value=current_local_hour, step=1)
     
-    scheduled_duration = st.slider("Duration (Minutes)", min_value=9.0, max_value=701.0, value = 120.0, step=1.0)
     
 st.divider()
 
@@ -168,8 +198,35 @@ def haversine_distance(lat1, long1, lat2, long2):
     c = 2 * atan2(sqrt(a), sqrt(1 - a))
     return R * c
 
+def extract_duration_from_match(match):
+    """ 
+    Extracts flight duration in minutes from an AeroDataBox flight match object.
+    Returns None if required fields are missing.
+    """
+    try:
+        dep_scheduled = match.get("departure", {}).get("scheduledTime", {}).get("utc")
+        arr_scheduled = match.get("arrival", {}).get("scheduledTime", {}).get("utc")
+
+        if not dep_scheduled or not arr_scheduled:
+            return None
+
+        # AeroDataBox typically returns ISO 8601 format, e.g. "2026-07-08T20:00Z"
+        dep_dt = datetime.datetime.fromisoformat(dep_scheduled.replace("Z", "+00:00"))
+        arr_dt = datetime.datetime.fromisoformat(arr_scheduled.replace("Z", "+00:00"))
+
+        duration_minutes = int((arr_dt - dep_dt).total_seconds() / 60)
+        return duration_minutes
+    except (KeyError, ValueError, TypeError) as e:
+        print(f"Could not extract duration: {e}")
+        return None
+
+duration_reg = joblib.load('../models/duration_regressor.pkl')
+
+def estimate_duration_from_distance(distance_miles):
+    return int(duration_reg.predict([[distance_miles]])[0])
+
 with center_col:
-    if st.button("Predict", use_container_width=True):
+    if st.button("Predict", use_container_width=True):        
         if not origin:
             st.error("You must enter an origin airport!")
             st.stop()
@@ -197,8 +254,6 @@ with center_col:
         
         distance = haversine_distance(latitude, longitude, destination_latitude, destination_longitude)
         
-        print(distance)
-        
         today = datetime.date.today()
         departure_date_str = departure_date.strftime('%Y-%m-%d')
         
@@ -207,6 +262,26 @@ with center_col:
             st.stop()
         else:
             base_url = "https://api.open-meteo.com/v1/forecast"
+        
+        with st.spinner("Checking live flight schedule..."):
+            try:
+                from_time, to_time = build_time_window(departure_date_str, departure_hour, window_hours=1)
+                departures = get_departures(origin, from_time, to_time, st.secrets["AERODATABOX_KEY"])
+                match = find_matching_flight(departures, destination, airline)
+            except requests.exceptions.RequestException as e:
+                st.warning(f"Live lookup unavailable ({e}) — using historical averages instead.")
+                match = None
+        
+        if match:
+            st.success(f"Found matching scheduled flight: {match.get('number', 'N/A')}")
+            scheduled_duration = extract_duration_from_match(match)
+            
+            if scheduled_duration is None:
+                st.warning("Couldn't determine live duration -- using a distance-based estimate.")
+                scheduled_duration = estimate_duration_from_distance(distance)
+        else:
+            st.error("No live flight matching inputted details.")
+            st.stop()
         
         url = (
             f"{base_url}?"
