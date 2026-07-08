@@ -3,3 +3,5 @@ data/
 *.parquet
 *.pkl
 .DS_Store
+
+.streamlit/secrets.toml
