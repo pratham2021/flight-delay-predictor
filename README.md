@@ -8,7 +8,7 @@ Use the slider to enter in departure hour (in accordance to the origin airport's
 
 Once the user hits the Predict button the app takes care of the rest by pinging the Open-Meteo API to get information on what the weather conditions at the origin airport are and consolidates all other user inputted data to pass off to the model in order to make a prediction!
 
-Note: If you enter in flight details (origin, destination, date, airline, and time) and there is no such flight that matches said details, you will get an error and the model won't predict any probability. So, it has to be a real flight.
+Note: Live flight matching uses AeroDataBox's free-tier schedule API (600 API units a month, 2400 requests a month), which has good but not complete coverage - some real flights may not appear in results
 
 Live Demo Link: https://us-flight-delay.streamlit.app/
 

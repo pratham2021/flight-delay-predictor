@@ -59,17 +59,44 @@ def build_time_window(date_str, local_hour, window_hours=1):
     end = base + timedelta(hours=window_hours)
     return start.strftime("%Y-%m-%dT%H:%M"), end.strftime("%Y-%m-%dT%H:%M")
 
-def find_matching_flight(departures_response, destination_iata, airline_iata):
-    print(destination_iata,)
+def find_matching_flight(departures_response, destination_iata, airline_iata, target_date, target_hour, target_minute, distance, duration_reg, minute_tolerance=10):
+    matches = []
+    expected_duration = duration_reg.predict([[distance]])[0]
+    target_total_minutes = target_hour * 60 + target_minute
+
     for flight in departures_response.get("departures", []):
         arr_iata = flight.get("arrival", {}).get("airport", {}).get("iata")
         plane_iata = flight.get("airline", {}).get("iata", "")
-        status = flight.get("status", "")
-        
-        if (arr_iata == destination_iata 
-            and plane_iata == airline_iata):
-            return flight
-    return None
+        if arr_iata != destination_iata or plane_iata != airline_iata:
+            continue
+
+        dep_local_str = flight.get("departure", {}).get("scheduledTime", {}).get("local")
+        if not dep_local_str:
+            continue
+
+        dep_local_dt = datetime.datetime.strptime(dep_local_str[:16], "%Y-%m-%d %H:%M")
+        if dep_local_dt.date() != target_date:
+            continue
+
+        flight_total_minutes = dep_local_dt.hour * 60 + dep_local_dt.minute
+        minute_diff = abs(flight_total_minutes - target_total_minutes)
+
+        if minute_diff <= minute_tolerance:
+            dep_str = flight.get("departure", {}).get("scheduledTime", {}).get("utc")
+            arr_str = flight.get("arrival", {}).get("scheduledTime", {}).get("utc")
+            dep_utc = datetime.datetime.fromisoformat(dep_str.replace("Z", "+00:00"))
+            arr_utc = datetime.datetime.fromisoformat(arr_str.replace("Z", "+00:00"))
+            implied_duration = (arr_utc - dep_utc).total_seconds() / 60
+            deviation = abs(implied_duration - expected_duration)
+            matches.append((minute_diff, deviation, dep_local_dt, flight))
+
+    if not matches:
+        return None
+
+    # Prefer closest minute match first, then duration plausibility as tiebreak
+    matches.sort(key=lambda x: (x[0], x[1]))
+    print(matches)
+    return matches[0][3]
 
 @st.cache_data(ttl=3600)
 def cached_get_departures(origin_iata, from_time, to_time, api_key):
@@ -182,12 +209,14 @@ with col2:
     timezone_str, lat, long = get_airport_timezone(origin, tf)
     local_tz = pytz.timezone(timezone_str)
     current_local_hour = datetime.datetime.now(local_tz).hour
+    current_local_minute = datetime.datetime.now(local_tz).minute
     
     if departure_date != datetime.date.today():
         departure_hour = st.slider("Departure Hour", min_value=0, max_value=23, value=current_local_hour, step=1)
     else:
         departure_hour = st.slider("Departure Hour", min_value=current_local_hour, max_value=23, value=current_local_hour, step=1)
-    
+        
+    departure_minute = st.slider("Departure Minute", min_value=0, max_value=60, value=0, step=1)
     
 st.divider()
 
@@ -201,28 +230,6 @@ def haversine_distance(lat1, long1, lat2, long2):
     a = sin(dlat/2) ** 2 + cos(latitude_1) * cos(latitude_2) * sin(dlon/2) ** 2
     c = 2 * atan2(sqrt(a), sqrt(1 - a))
     return R * c
-
-def extract_duration_from_match(match):
-    """ 
-    Extracts flight duration in minutes from an AeroDataBox flight match object.
-    Returns None if required fields are missing.
-    """
-    try:
-        dep_scheduled = match.get("departure", {}).get("scheduledTime", {}).get("utc")
-        arr_scheduled = match.get("arrival", {}).get("scheduledTime", {}).get("utc")
-
-        if not dep_scheduled or not arr_scheduled:
-            return None
-
-        # AeroDataBox typically returns ISO 8601 format, e.g. "2026-07-08T20:00Z"
-        dep_dt = datetime.datetime.fromisoformat(dep_scheduled.replace("Z", "+00:00"))
-        arr_dt = datetime.datetime.fromisoformat(arr_scheduled.replace("Z", "+00:00"))
-
-        duration_minutes = int((arr_dt - dep_dt).total_seconds() / 60)
-        return duration_minutes
-    except (KeyError, ValueError, TypeError) as e:
-        print(f"Could not extract duration: {e}")
-        return None
 
 def estimate_duration_from_distance(distance):
     prediction = duration_reg.predict([[distance]])[0]
@@ -270,8 +277,10 @@ with center_col:
             try:
                 from_time, to_time = build_time_window(departure_date_str, departure_hour, window_hours=1)
                 departures = get_departures(origin, from_time, to_time, st.secrets["AERODATABOX_KEY"])
-                print(destination, airline)
-                match = find_matching_flight(departures, destination, airline)
+                target_local_dt = datetime.datetime(
+                    departure_date.year, departure_date.month, departure_date.day, departure_hour
+                )
+                match = find_matching_flight(departures, destination, airline, departure_date, departure_hour, departure_minute, distance, duration_reg)
             except requests.exceptions.RequestException as e:
                 st.warning(f"Live lookup unavailable ({e}) — using historical averages instead.")
                 match = None
