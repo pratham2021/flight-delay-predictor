@@ -4,9 +4,11 @@ The app predicts a probability of flight delay based on 7 key pieces of informat
 
 Select your origin, destination, departure date, and airline from the four respective dropdowns.
 
-Use the sliders to tell the app to enter the hour (in accordance to the origin airport) of your scheduled departure, how many miles you'll be flying, and the scheduled flight duration.
+Use the slider to enter in departure hour (in accordance to the origin airport's local time)
 
-Once the user hits the Predict button the app takes care of the rest, by pinging the Open-Meteo API to get information on what the weather conditions at the origin airport are and consolidates all other user inputted data to pass off to the model in order to make a prediction!
+Once the user hits the Predict button the app takes care of the rest by pinging the Open-Meteo API to get information on what the weather conditions at the origin airport are and consolidates all other user inputted data to pass off to the model in order to make a prediction!
+
+Note: If you enter in flight details (origin, destination, date, airline, and time) and there is no such flight that matches said details, you will get an error and the model won't predict any probability. So, it has to be a real flight.
 
 Live Demo Link: https://us-flight-delay.streamlit.app/
 
@@ -64,7 +66,7 @@ Metrics: 74.6% AUC-ROC, 80% accuracy, 66.3% FNR and 7% FPR
 
 # 5. Future Improvements
 
-Access to more months worth of flight data
+Access to more months worth of flight data (from 2024)
 
 Air Traffic Controller data corresponding to each one of the over 9 million flights in the dataset
 

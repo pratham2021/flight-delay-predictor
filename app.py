@@ -59,15 +59,19 @@ def build_time_window(date_str, local_hour, window_hours=1):
     end = base + timedelta(hours=window_hours)
     return start.strftime("%Y-%m-%dT%H:%M"), end.strftime("%Y-%m-%dT%H:%M")
 
-def find_matching_flight(departures_response, destination_iata, airline_name):
+def find_matching_flight(departures_response, destination_iata, airline_iata):
+    print(destination_iata,)
     for flight in departures_response.get("departures", []):
         arr_iata = flight.get("arrival", {}).get("airport", {}).get("iata")
-        airline = flight.get("airline", {}).get("iata", "")
-        if arr_iata == destination_iata and airline_name.lower() in airline.lower():
+        plane_iata = flight.get("airline", {}).get("iata", "")
+        status = flight.get("status", "")
+        
+        if (arr_iata == destination_iata 
+            and plane_iata == airline_iata):
             return flight
     return None
 
-@st.cache_data(ttl=3600) # cache for 1 hour
+@st.cache_data(ttl=3600)
 def cached_get_departures(origin_iata, from_time, to_time, api_key):
     return get_departures(origin_iata, from_time, to_time, api_key)
 
@@ -220,8 +224,9 @@ def extract_duration_from_match(match):
         print(f"Could not extract duration: {e}")
         return None
 
-def estimate_duration_from_distance(distance_miles):
-    return int(duration_reg.predict([[distance_miles]])[0])
+def estimate_duration_from_distance(distance):
+    prediction = duration_reg.predict([[distance]])[0]
+    return int(prediction)
 
 with center_col:
     if st.button("Predict", use_container_width=True):        
@@ -265,6 +270,7 @@ with center_col:
             try:
                 from_time, to_time = build_time_window(departure_date_str, departure_hour, window_hours=1)
                 departures = get_departures(origin, from_time, to_time, st.secrets["AERODATABOX_KEY"])
+                print(destination, airline)
                 match = find_matching_flight(departures, destination, airline)
             except requests.exceptions.RequestException as e:
                 st.warning(f"Live lookup unavailable ({e}) — using historical averages instead.")
@@ -272,11 +278,21 @@ with center_col:
         
         if match:
             st.success(f"Found matching scheduled flight: {match.get('number', 'N/A')}")
-            scheduled_duration = extract_duration_from_match(match)
             
-            if scheduled_duration is None:
-                st.warning("Couldn't determine live duration -- using a distance-based estimate.")
-                scheduled_duration = estimate_duration_from_distance(distance)
+            duration = estimate_duration_from_distance(distance)
+            
+            hour = duration // 60
+            minutes = duration % 60
+            
+            if hour == 0:
+                print(f"Flight Time: {minutes} minutes")
+            elif hour == 1:
+                if minutes == 0:
+                    print(f"Flight Time: {hour} hour")
+                else:
+                    print(f"Flight Time: {hour} hour and {minutes} minutes")
+            else:
+                print(f"Flight Time: {hour} hour and {minutes} minutes")
         else:
             st.error("No live flight matching inputted details.")
             st.stop()
@@ -351,7 +367,7 @@ with center_col:
             'MONTH': [MONTH],
             'IS_HOLIDAY_PERIOD': [IS_HOLIDAY_PERIOD],
             'DISTANCE': [distance],
-            'CRS_ELAPSED_TIME': [scheduled_duration],
+            'CRS_ELAPSED_TIME': [duration],
             'ORIGIN_STATE_ABR': [origin_state_encoded],
             'DEST_STATE_ABR': [dest_state_encoded],
             'ROUTE_HOURLY_FLIGHTS': [route_hourly_flights],
