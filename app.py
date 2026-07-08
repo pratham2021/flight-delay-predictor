@@ -7,6 +7,7 @@ import datetime
 import requests
 import pytz
 from timezonefinder import TimezoneFinder
+from math import radians, sin, cos, sqrt, atan2
 
 hide_streamlit_style = """
     <style>
@@ -152,12 +153,20 @@ with col2:
     else:
         departure_hour = st.slider("Departure Hour", min_value=current_local_hour, max_value=23, value=current_local_hour, step=1)
     
-    distance = st.slider("Distance (Miles)", min_value=31.0, max_value=5100.0, value=0.0, step=1.0)
     scheduled_duration = st.slider("Duration (Minutes)", min_value=9.0, max_value=701.0, value = 120.0, step=1.0)
     
 st.divider()
 
 _, center_col, _ = st.columns([1, 2, 1])
+
+def haversine_distance(lat1, long1, lat2, long2):
+    R = 3958.8 # Earth radius in miles
+    latitude_1, longitude_1, latitude_2, longitude_2 = map(radians, [lat1, long1, lat2, long2])
+    dlat = latitude_2 - latitude_1
+    dlon = longitude_2 - longitude_1
+    a = sin(dlat/2) ** 2 + cos(latitude_1) * cos(latitude_2) * sin(dlon/2) ** 2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    return R * c
 
 with center_col:
     if st.button("Predict", use_container_width=True):
@@ -182,6 +191,13 @@ with center_col:
             
         latitude = airports[airports['iata_code'] == origin]['latitude_deg'].values[0]
         longitude = airports[airports['iata_code'] == origin]['longitude_deg'].values[0]
+        
+        destination_latitude = airports[airports['iata_code'] == destination]['latitude_deg'].values[0]
+        destination_longitude = airports[airports['iata_code'] == destination]['longitude_deg'].values[0]
+        
+        distance = haversine_distance(latitude, longitude, destination_latitude, destination_longitude)
+        
+        print(distance)
         
         today = datetime.date.today()
         departure_date_str = departure_date.strftime('%Y-%m-%d')
