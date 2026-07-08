@@ -93,9 +93,9 @@ def get_airport_display_names():
 airport_names = get_airport_display_names()
 
 @st.cache_data
-def get_airport_timezone(iata_code, timeZoneFinder):
+def get_airport_timezone(iata_code, _timeZoneFinder):
     row = airports[airports['iata_code'] == iata_code].iloc[0]
-    timezone_str = timeZoneFinder.timezone_at(lat=row['latitude_deg'], lng=row['longitude_deg'])
+    timezone_str = _timeZoneFinder.timezone_at(lat=row['latitude_deg'], lng=row['longitude_deg'])
     return timezone_str, row['latitude_deg'], row['longitude_deg']
 
 @st.cache_resource
