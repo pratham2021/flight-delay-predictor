@@ -10,6 +10,8 @@ Once the user hits the Predict button the app takes care of the rest by pinging 
 
 Note: Live flight matching uses AeroDataBox's free-tier schedule API (600 API units a month, 2400 requests a month), which has good but not complete coverage - some real flights may not appear in results
 
+Note: Live inbound flight tracking is available for outgoing flights that haven't landed at the origin airport.
+
 Live Demo Link: https://us-flight-delay.streamlit.app/
 
 ![alt text](app_screenshot.png)
