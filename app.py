@@ -455,11 +455,6 @@ with center_col:
                     track_data = get_flight_track(icao24)
                     real_path_points = extract_track_points(track_data)
                     
-                    print("ICAO24: ", icao24)
-                    print("Track data: ", track_data)
-                    print("Real path points: ", real_path_points)
-                    
-                    print("Real flight path showing")
                     show_flight_path(latitude, longitude, destination_latitude, destination_longitude, real_path_points=real_path_points, 
                                      inbound_dep_lat=inbound_dep_lat, inbound_dep_lon=inbound_dep_lon, inbound_pos_lat=inbound_pos_lat, inbound_pos_lon=inbound_pos_lon)
                 else:
