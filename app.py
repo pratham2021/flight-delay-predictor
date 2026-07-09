@@ -277,7 +277,7 @@ def show_flight_path(origin_lat, origin_lon, dest_lat, dest_lon, plane_lat=None,
         "LineLayer", data=path_data,
         get_source_position=["start_lon", "start_lat"],
         get_target_position=["end_lon", "end_lat"],
-        get_width=3, get_color=[255, 0, 0],  # red = your flight's route
+        get_width=3, get_color=[255, 0, 0],
     )
     layers = [line_layer]
     
@@ -287,8 +287,7 @@ def show_flight_path(origin_lat, origin_lon, dest_lat, dest_lon, plane_lat=None,
         and abs(inbound_dep_lon - dest_lon) < 0.01
     )
 
-    # Inbound leg — the aircraft's previous flight, bringing it to your origin
-    if inbound_dep_lat is not None and inbound_dep_lon is not None and not is_reverse_route:
+    if inbound_dep_lat is not None and inbound_dep_lon is not None and not is_reverse_route: # drawing the path of the incoming plane
         inbound_path_data = pd.DataFrame({
             'start_lat': [inbound_dep_lat], 'start_lon': [inbound_dep_lon],
             'end_lat': [origin_lat], 'end_lon': [origin_lon]
