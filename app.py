@@ -263,53 +263,93 @@ def find_inbound_leg(flights, origin_iata):
     for flight in flights:
         arr_iata = flight.get("arrival", {}).get("airport", {}).get("iata")
         if arr_iata == origin_iata and "location" in flight:
-            return flight  # this aircraft is currently flying INTO your origin
+            return flight  # this is the inbound plane
     return None
 
-def show_flight_path(origin_lat, origin_lon, dest_lat, dest_lon, plane_lat=None, plane_lon=None,
-                      inbound_dep_lat=None, inbound_dep_lon=None, inbound_pos_lat=None, inbound_pos_lon=None):
+def get_flight_track(icao24, api_key=None):
+    if not icao24:
+        return None
+    url = "https://opensky-network.org/api/tracks/all"
+    params = { "icao24": icao24.lower(), "time": 0 }
+    try:
+        resp = requests.get(url, params=params, timeout=10)
+        resp.raise_for_status()
+        return resp.json()
+    except requests.exceptions.RequestException:
+        return None
+
+def extract_track_points(track_data):
+    if not track_data or "path" not in track_data:
+        return None
+    points = []
+    for waypoint in track_data["path"]:
+        # waypoint: [time, lat, lon, baro_altitude, true_track, on_ground]
+        lat, lon = waypoint[1], waypoint[2]
+        if lat is not None and lon is not None:
+            points.append([lon, lat])
+    return points if points else None
+
+def great_circle_points(lat1, lon1, lat2, lon2, num_points=50):
+    lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+    d = 2 * np.arcsin(np.sqrt( 
+        np.sin((lat2 - lat1) / 2) ** 2 +
+        np.cos(lat1) * np.cos(lat2) * np.sin((lon2 - lon1) / 2) ** 2
+    ))
     
-    path_data = pd.DataFrame({
-        'start_lat': [origin_lat], 'start_lon': [origin_lon],
-        'end_lat': [dest_lat], 'end_lon': [dest_lon]
-    })
+    if d == 0:
+        return [[np.degrees(lon1), np.degrees(lon2)]]
+
+    points = []
+    
+    for i in range(num_points + 1):
+        f = i / num_points
+        a = np.sin((1 - f) * d) / np.sin(d)
+        b = np.sin(f * d) / np.sin(d)
+        x = a * np.cos(lat1) * np.cos(lon1) + b * np.cos(lat2) * np.cos(lon2)
+        y = a * np.cos(lat1) * np.sin(lon1) + b * np.cos(lat2) * np.sin(lon2)
+        z = a * np.sin(lat1) + b * np.sin(lat2)
+        lat = np.degrees(np.arctan2(z, np.sqrt(x**2 + y**2)))
+        lon = np.degrees(np.arctan2(y, x))
+        points.append([lon, lat])
+
+    return points
+
+
+def show_flight_path(origin_lat, origin_lon, dest_lat, dest_lon, real_path_points=None, inbound_dep_lat=None, inbound_dep_lon=None, inbound_pos_lat=None, inbound_pos_lon=None):
+
+    if real_path_points and len(real_path_points) >= 2:
+        curve_points = real_path_points
+    else:
+        curve_points = great_circle_points(origin_lat, origin_lon, dest_lat, dest_lon)
+    
+    path_data = pd.DataFrame({'path': [curve_points]})
     line_layer = pdk.Layer(
-        "LineLayer", data=path_data,
-        get_source_position=["start_lon", "start_lat"],
-        get_target_position=["end_lon", "end_lat"],
-        get_width=3, get_color=[255, 0, 0],
+        "PathLayer",
+        data=path_data,
+        get_path="path",
+        get_width=3,
+        get_color=[0, 168, 107],
+        width_min_pixels=2,
     )
+    
     layers = [line_layer]
     
-    is_reverse_route = (
-        inbound_dep_lat is not None and inbound_dep_lon is not None
-        and abs(inbound_dep_lat - dest_lat) < 0.01
-        and abs(inbound_dep_lon - dest_lon) < 0.01
-    )
-
-    if inbound_dep_lat is not None and inbound_dep_lon is not None and not is_reverse_route: # drawing the path of the incoming plane
-        inbound_path_data = pd.DataFrame({
-            'start_lat': [inbound_dep_lat], 'start_lon': [inbound_dep_lon],
-            'end_lat': [origin_lat], 'end_lon': [origin_lon]
-        })
-        layers.append(pdk.Layer(
-            "LineLayer", data=inbound_path_data,
-            get_source_position=["start_lon", "start_lat"],
-            get_target_position=["end_lon", "end_lat"],
-            get_width=2, get_color=[255, 165, 0],
-        ))
-
-    if inbound_pos_lat is not None and inbound_pos_lon is not None: # where is the incoming plane is at
-        inbound_pos_data = pd.DataFrame({'lat': [inbound_pos_lat], 'lon': [inbound_pos_lon]})
-        layers.append(pdk.Layer(
-            "ScatterplotLayer", data=inbound_pos_data,
-            get_position=["lon", "lat"],
-            get_radius=1500, radius_min_pixels=8,
-            get_fill_color=[255, 165, 0],
-        ))
-
-    all_lats = [origin_lat, dest_lat] + ([inbound_dep_lat] if inbound_dep_lat else [])
-    all_lons = [origin_lon, dest_lon] + ([inbound_dep_lon] if inbound_dep_lon else [])
+    last_point = curve_points[-1]
+    last_lon, last_lat = last_point[0], last_point[1]
+    
+    last_point_data = pd.DataFrame({'lat': [last_lat], 'lon': [last_lon]})
+    
+    layers.append(pdk.Layer(
+        "ScatterplotLayer",
+        data=last_point_data,
+        get_position=["lon", "lat"],
+        get_radius=1500,
+        radius_min_pixels=8,
+        get_fill_color=[255, 0, 0],
+    ))
+    
+    all_lats = [origin_lat, dest_lat] + ([inbound_dep_lat] if inbound_dep_lat is not None else [])
+    all_lons = [origin_lon, dest_lon] + ([inbound_dep_lon] if inbound_dep_lon is not None else [])
     
     view_state = pdk.ViewState(
         latitude=sum(all_lats) / len(all_lats),
@@ -367,6 +407,7 @@ with center_col:
                 target_local_dt = datetime.datetime(
                     departure_date.year, departure_date.month, departure_date.day, departure_hour
                 )
+                print(departures)
                 match = find_matching_flight(departures, destination, airline, departure_date, departure_hour, departure_minute, distance, duration_reg)
             except requests.exceptions.RequestException as e:
                 st.warning(f"Live lookup unavailable ({e}) — using historical averages instead.")
@@ -381,14 +422,14 @@ with center_col:
             minutes = duration % 60
             
             if hour == 0:
-                print(f"Flight Time: {minutes} minutes")
+                st.write(f"Flight Time: {minutes} minutes")
             elif hour == 1:
                 if minutes == 0:
-                    print(f"Flight Time: {hour} hour")
+                    st.write(f"Flight Time: {hour} hour")
                 else:
-                    print(f"Flight Time: {hour} hour and {minutes} minutes")
+                    st.write(f"Flight Time: {hour} hour and {minutes} minutes")
             else:
-                print(f"Flight Time: {hour} hour and {minutes} minutes")
+                st.write(f"Flight Time: {hour} hour and {minutes} minutes")
             
             aircraft_reg = match.get('aircraft', {}).get('reg')
             inbound_flight = None
@@ -410,7 +451,17 @@ with center_col:
                     inbound_pos_lon = inbound_pos.get('lon')
                     st.info(f"Your aircraft is currently airborne, inbound from {dep_airport}.")
                     
-                    show_flight_path(latitude, longitude, destination_latitude, destination_longitude, None, None, inbound_dep_lat, inbound_dep_lon, inbound_pos_lat, inbound_pos_lon)
+                    icao24 = match.get('aircraft', {}).get('modeS')
+                    track_data = get_flight_track(icao24)
+                    real_path_points = extract_track_points(track_data)
+                    
+                    print("ICAO24: ", icao24)
+                    print("Track data: ", track_data)
+                    print("Real path points: ", real_path_points)
+                    
+                    print("Real flight path showing")
+                    show_flight_path(latitude, longitude, destination_latitude, destination_longitude, real_path_points=real_path_points, 
+                                     inbound_dep_lat=inbound_dep_lat, inbound_dep_lon=inbound_dep_lon, inbound_pos_lat=inbound_pos_lat, inbound_pos_lon=inbound_pos_lon)
                 else:
                     st.info(f"Your aircraft is scheduled to arrive from {dep_airport}, departing {dep_time}.")
             else:
