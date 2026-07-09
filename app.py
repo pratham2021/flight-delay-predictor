@@ -9,6 +9,8 @@ import pytz
 from timezonefinder import TimezoneFinder
 from math import radians, sin, cos, sqrt, atan2
 from datetime import timedelta
+import pydeck as pdk
+import time
 
 hide_streamlit_style = """
     <style>
@@ -84,18 +86,21 @@ def find_matching_flight(departures_response, destination_iata, airline_iata, ta
         if minute_diff <= minute_tolerance:
             dep_str = flight.get("departure", {}).get("scheduledTime", {}).get("utc")
             arr_str = flight.get("arrival", {}).get("scheduledTime", {}).get("utc")
-            dep_utc = datetime.datetime.fromisoformat(dep_str.replace("Z", "+00:00"))
-            arr_utc = datetime.datetime.fromisoformat(arr_str.replace("Z", "+00:00"))
-            implied_duration = (arr_utc - dep_utc).total_seconds() / 60
-            deviation = abs(implied_duration - expected_duration)
+
+            if dep_str and arr_str:
+                dep_utc = datetime.datetime.fromisoformat(dep_str.replace("Z", "+00:00"))
+                arr_utc = datetime.datetime.fromisoformat(arr_str.replace("Z", "+00:00"))
+                implied_duration = (arr_utc - dep_utc).total_seconds() / 60
+                deviation = abs(implied_duration - expected_duration)
+            else:
+                deviation = float('inf')
+
             matches.append((minute_diff, deviation, dep_local_dt, flight))
 
     if not matches:
         return None
 
-    # Prefer closest minute match first, then duration plausibility as tiebreak
     matches.sort(key=lambda x: (x[0], x[1]))
-    print(matches)
     return matches[0][3]
 
 @st.cache_data(ttl=3600)
@@ -235,6 +240,87 @@ def estimate_duration_from_distance(distance):
     prediction = duration_reg.predict([[distance]])[0]
     return int(prediction)
 
+def get_aircraft_current_flight(aircraft_reg, api_key):
+    if not aircraft_reg:
+        return None
+    url = f"https://aerodatabox.p.rapidapi.com/flights/reg/{aircraft_reg}"
+    headers = {"x-rapidapi-key": api_key, "x-rapidapi-host": "aerodatabox.p.rapidapi.com"}
+    params = {"withLocation": "true"}
+    resp = requests.get(url, headers=headers, params=params, timeout=10)
+    if resp.status_code == 429:
+        time.sleep(1.5)
+        resp = requests.get(url, headers=headers, params=params, timeout=10)
+    resp.raise_for_status()
+    return resp.json()
+
+def find_inbound_leg(flights, origin_iata):
+    for flight in flights:
+        arr_iata = flight.get("arrival", {}).get("airport", {}).get("iata")
+        if arr_iata == origin_iata and "location" in flight:
+            return flight  # this aircraft is currently flying INTO your origin
+    return None
+
+def show_flight_path(origin_lat, origin_lon, dest_lat, dest_lon, plane_lat=None, plane_lon=None,
+                      inbound_dep_lat=None, inbound_dep_lon=None, inbound_pos_lat=None, inbound_pos_lon=None):
+    
+    path_data = pd.DataFrame({
+        'start_lat': [origin_lat], 'start_lon': [origin_lon],
+        'end_lat': [dest_lat], 'end_lon': [dest_lon]
+    })
+    line_layer = pdk.Layer(
+        "LineLayer", data=path_data,
+        get_source_position=["start_lon", "start_lat"],
+        get_target_position=["end_lon", "end_lat"],
+        get_width=3, get_color=[255, 0, 0],  # red = your flight's route
+    )
+    layers = [line_layer]
+
+    # Your flight's live position, if airborne
+    if plane_lat is not None and plane_lon is not None:
+        plane_data = pd.DataFrame({'lat': [plane_lat], 'lon': [plane_lon]})
+        layers.append(pdk.Layer(
+            "ScatterplotLayer", data=plane_data,
+            get_position=["lon", "lat"],
+            get_radius=15000, radius_min_pixels=8,
+            get_fill_color=[0, 255, 0],  # green = your flight
+        ))
+
+    # Inbound leg — the aircraft's previous flight, bringing it to your origin
+    if inbound_dep_lat is not None and inbound_dep_lon is not None:
+        inbound_path_data = pd.DataFrame({
+            'start_lat': [inbound_dep_lat], 'start_lon': [inbound_dep_lon],
+            'end_lat': [origin_lat], 'end_lon': [origin_lon]
+        })
+        layers.append(pdk.Layer(
+            "LineLayer", data=inbound_path_data,
+            get_source_position=["start_lon", "start_lat"],
+            get_target_position=["end_lon", "end_lat"],
+            get_width=2, get_color=[255, 165, 0],
+        ))
+
+    if inbound_pos_lat is not None and inbound_pos_lon is not None:
+        inbound_pos_data = pd.DataFrame({'lat': [inbound_pos_lat], 'lon': [inbound_pos_lon]})
+        layers.append(pdk.Layer(
+            "ScatterplotLayer", data=inbound_pos_data,
+            get_position=["lon", "lat"],
+            get_radius=15000, radius_min_pixels=8,
+            get_fill_color=[255, 165, 0],
+        ))
+
+    all_lats = [origin_lat, dest_lat] + ([inbound_dep_lat] if inbound_dep_lat else [])
+    all_lons = [origin_lon, dest_lon] + ([inbound_dep_lon] if inbound_dep_lon else [])
+    
+    view_state = pdk.ViewState(
+        latitude=sum(all_lats) / len(all_lats),
+        longitude=sum(all_lons) / len(all_lons),
+        zoom=3,
+    )
+    st.pydeck_chart(pdk.Deck(
+        layers=layers,
+        initial_view_state=view_state,
+        map_style="mapbox://styles/mapbox/light-v9"
+    ))
+
 with center_col:
     if st.button("Predict", use_container_width=True):        
         if not origin:
@@ -302,6 +388,32 @@ with center_col:
                     print(f"Flight Time: {hour} hour and {minutes} minutes")
             else:
                 print(f"Flight Time: {hour} hour and {minutes} minutes")
+            
+            aircraft_reg = match.get('aircraft', {}).get('reg')
+            inbound_flight = None
+            if aircraft_reg:
+               aircraft_flights = get_aircraft_current_flight(aircraft_reg, st.secrets["AERODATABOX_KEY"])
+               if aircraft_flights:
+                    inbound_flight = find_inbound_leg(aircraft_flights, origin)
+
+            if inbound_flight:
+                dep_airport = inbound_flight['departure']['airport']['name']
+                dep_time = inbound_flight['departure']['scheduledTime']['local']
+                inbound_pos = inbound_flight.get('location')
+                
+                inbound_dep_lat = inbound_flight['departure']['airport']['location']['lat']
+                inbound_dep_lon = inbound_flight['departure']['airport']['location']['lon']
+            
+                if inbound_pos:
+                    inbound_pos_lat = inbound_pos.get('lat')
+                    inbound_pos_lon = inbound_pos.get('lon')
+                    st.info(f"Your aircraft is currently airborne, inbound from {dep_airport}.")
+                    
+                    show_flight_path(latitude, longitude, destination_latitude, destination_longitude, None, None, inbound_dep_lat, inbound_dep_lon, inbound_pos_lat, inbound_pos_lon)
+                else:
+                    st.info(f"Your aircraft is scheduled to arrive from {dep_airport}, departing {dep_time}.")
+            else:
+                st.caption("No inbound aircraft data available. Aircraft is likely already at the gate.")
         else:
             st.error("No live flight matching inputted details.")
             st.stop()
