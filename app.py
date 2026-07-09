@@ -222,7 +222,7 @@ with col2:
     current_local_hour = datetime.datetime.now(local_tz).hour
     current_local_minute = datetime.datetime.now(local_tz).minute
     
-    if departure_date != datetime.date.today():
+    if departure_date != today_local:
         departure_hour = st.slider("Departure Hour", min_value=0, max_value=23, value=current_local_hour, step=1)
     else:
         departure_hour = st.slider("Departure Hour", min_value=current_local_hour, max_value=23, value=current_local_hour, step=1)
