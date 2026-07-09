@@ -192,7 +192,13 @@ with col1:
         index=airport_codes.index('AUS'),  
         format_func=lambda x: airport_names.get(x, x)
     )
-    departure_date = st.date_input("Departure Date", min_value=datetime.date.today(), value=datetime.date.today())
+    
+    timezone_str, lat, long = get_airport_timezone(origin, tf)
+    local_tz = pytz.timezone(timezone_str)
+    today_local = datetime.datetime.now(local_tz).date()
+    departure_date = st.date_input("Departure Date", min_value=today_local, value=today_local)
+
+    # departure_date = st.date_input("Departure Date", min_value=datetime.date.today(), value=datetime.date.today())
 
 with col2:    
     destination = st.selectbox(
@@ -274,19 +280,15 @@ def show_flight_path(origin_lat, origin_lon, dest_lat, dest_lon, plane_lat=None,
         get_width=3, get_color=[255, 0, 0],  # red = your flight's route
     )
     layers = [line_layer]
-
-    # Your flight's live position, if airborne
-    if plane_lat is not None and plane_lon is not None:
-        plane_data = pd.DataFrame({'lat': [plane_lat], 'lon': [plane_lon]})
-        layers.append(pdk.Layer(
-            "ScatterplotLayer", data=plane_data,
-            get_position=["lon", "lat"],
-            get_radius=15000, radius_min_pixels=8,
-            get_fill_color=[0, 255, 0],  # green = your flight
-        ))
+    
+    is_reverse_route = (
+        inbound_dep_lat is not None and inbound_dep_lon is not None
+        and abs(inbound_dep_lat - dest_lat) < 0.01
+        and abs(inbound_dep_lon - dest_lon) < 0.01
+    )
 
     # Inbound leg — the aircraft's previous flight, bringing it to your origin
-    if inbound_dep_lat is not None and inbound_dep_lon is not None:
+    if inbound_dep_lat is not None and inbound_dep_lon is not None and not is_reverse_route:
         inbound_path_data = pd.DataFrame({
             'start_lat': [inbound_dep_lat], 'start_lon': [inbound_dep_lon],
             'end_lat': [origin_lat], 'end_lon': [origin_lon]
@@ -298,12 +300,12 @@ def show_flight_path(origin_lat, origin_lon, dest_lat, dest_lon, plane_lat=None,
             get_width=2, get_color=[255, 165, 0],
         ))
 
-    if inbound_pos_lat is not None and inbound_pos_lon is not None:
+    if inbound_pos_lat is not None and inbound_pos_lon is not None: # where is the incoming plane is at
         inbound_pos_data = pd.DataFrame({'lat': [inbound_pos_lat], 'lon': [inbound_pos_lon]})
         layers.append(pdk.Layer(
             "ScatterplotLayer", data=inbound_pos_data,
             get_position=["lon", "lat"],
-            get_radius=15000, radius_min_pixels=8,
+            get_radius=1500, radius_min_pixels=8,
             get_fill_color=[255, 165, 0],
         ))
 
@@ -333,7 +335,7 @@ with center_col:
             st.error("You must enter an airline!")
             st.stop()
         
-        if departure_date == datetime.date.today() and departure_hour < current_local_hour:
+        if departure_date == today_local and departure_hour < current_local_hour:
             st.warning("Please select a current or future departure hour!")
             st.stop()
         
@@ -353,7 +355,7 @@ with center_col:
         today = datetime.date.today()
         departure_date_str = departure_date.strftime('%Y-%m-%d')
         
-        if departure_date > today + datetime.timedelta(days=16):
+        if departure_date > today_local + datetime.timedelta(days=16):
             st.error("Weather forecast is only available up to 16 days in advance. Please select an earlier date.")
             st.stop()
         else:
