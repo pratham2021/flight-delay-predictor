@@ -533,7 +533,7 @@ with center_col:
             'MONTH': [MONTH],
             'IS_HOLIDAY_PERIOD': [IS_HOLIDAY_PERIOD],
             'DISTANCE': [distance],
-            'CRS_ELAPSED_TIME': [duration],
+            'CRS_ELAPSED_TIME': [estimated_duration],
             'ORIGIN_STATE_ABR': [origin_state_encoded],
             'DEST_STATE_ABR': [dest_state_encoded],
             'ROUTE_HOURLY_FLIGHTS': [route_hourly_flights],
