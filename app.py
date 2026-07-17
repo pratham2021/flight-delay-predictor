@@ -26,7 +26,6 @@ st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 def load_items():
     tf = TimezoneFinder()
     model = joblib.load('models/best_model.pkl')
-    df = pd.read_parquet('data/cleaned_data.parquet')
     
     le_carrier = joblib.load('encodings/le_carrier.pkl')
     le_origin_state = joblib.load('encodings/le_origin_state.pkl')
@@ -48,9 +47,9 @@ def load_items():
     
     duration_reg = joblib.load('models/duration_regressor.pkl')
     
-    return model, df, duration_reg, le_carrier, le_origin_state, le_dest_state, origin_te, dest_te, route_te, origin_hourly_avg, dest_hourly_avg, route_hourly_avg, carrier_delay_map, origin_delay_map, dest_delay_map, route_delay_map, best_threshold, tf
+    return model, duration_reg, le_carrier, le_origin_state, le_dest_state, origin_te, dest_te, route_te, origin_hourly_avg, dest_hourly_avg, route_hourly_avg, carrier_delay_map, origin_delay_map, dest_delay_map, route_delay_map, best_threshold, tf
 
-model, df, duration_reg, le_carrier, le_origin_state, le_dest_state, origin_te, dest_te, route_te, origin_hourly_avg, dest_hourly_avg, route_hourly_avg, carrier_delay_map, origin_delay_map, dest_delay_map, route_delay_map, best_threshold, tf = load_items()
+model, duration_reg, le_carrier, le_origin_state, le_dest_state, origin_te, dest_te, route_te, origin_hourly_avg, dest_hourly_avg, route_hourly_avg, carrier_delay_map, origin_delay_map, dest_delay_map, route_delay_map, best_threshold, tf = load_items()
 
 def isHolidayPeriod(date):
     if date.month == 1 and 15 <= date.day <= 20:
@@ -141,10 +140,7 @@ def cached_get_departures(origin_iata, from_time, to_time, api_key):
 
 @st.cache_data
 def get_cleaned_airports():
-    airport_data = pd.read_csv('airports/airports.csv')
-    airport_data = airport_data.dropna(subset=['iata_code'])
-    airport_data = airport_data[airport_data['iata_code'] != 'None']
-    airport_data = airport_data[airport_data['iata_code'].isin(df['ORIGIN'].unique())]
+    airport_data = pd.read_csv('airports/airports_cleaned.csv')
     return airport_data
 
 airport_data = get_cleaned_airports()
