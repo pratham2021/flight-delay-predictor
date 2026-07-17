@@ -225,7 +225,7 @@ with col2:
     else:
         departure_hour = st.slider("Departure Hour", min_value=current_local_hour, max_value=23, value=current_local_hour, step=1)
         
-    departure_minute = st.slider("Departure Minute", min_value=0, max_value=60, value=0, step=1)
+    departure_minute = st.slider("Departure Minute", min_value=0, max_value=59, value=0, step=1)
     
 st.divider()
 
@@ -414,10 +414,10 @@ with center_col:
         if match:
             st.success(f"Found matching scheduled flight: {match.get('number', 'N/A')}")
             
-            duration = estimate_duration_from_distance(distance)
+            estimated_duration = estimate_duration_from_distance(distance)
             
-            hour = duration // 60
-            minutes = duration % 60
+            hour = estimated_duration // 60
+            minutes = estimated_duration % 60
             
             if hour == 0:
                 st.write(f"Flight Time: {minutes} minutes")
@@ -461,7 +461,7 @@ with center_col:
                 st.caption("No inbound aircraft data available. Aircraft is likely already at the gate.")
         else:
             st.error("No live flight matching inputted details.")
-            st.stop()
+            # st.stop()
         
         url = (
             f"{base_url}?"
