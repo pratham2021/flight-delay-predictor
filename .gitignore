@@ -1,6 +1,6 @@
-data/*.parquet
-!data/cleaned_data.parquet
-data/*.csv
+data/
+*.parquet
+*.csv
 encodings/*.pkl
 models/*.pkl
 
