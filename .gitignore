@@ -1,11 +1,9 @@
-data/
-*.csv
-*.parquet
-*.pkl
+data/*.parquet
+!data/cleaned_data.parquet
+data/*.csv
+encodings/*.pkl
+models/*.pkl
 
 .DS_Store
 
 .streamlit/secrets.toml
-
-models/
-*.pkl
