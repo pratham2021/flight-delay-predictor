@@ -1,6 +1,4 @@
 data/
-encodings/*.pkl
-models/*.pkl
 
 .DS_Store
 
