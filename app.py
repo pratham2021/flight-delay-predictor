@@ -12,6 +12,8 @@ from datetime import timedelta
 import pydeck as pdk
 import time
 
+st.set_page_config("US Flight Delay Predictor")
+
 hide_streamlit_style = """
     <style>
     #MainMenu {visibility: hidden;}
@@ -19,6 +21,36 @@ hide_streamlit_style = """
     </style>
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
+@st.cache_resource
+def load_items():
+    tf = TimezoneFinder()
+    model = joblib.load('models/best_model.pkl')
+    df = pd.read_parquet('data/cleaned_data.parquet')
+    
+    le_carrier = joblib.load('encodings/le_carrier.pkl')
+    le_origin_state = joblib.load('encodings/le_origin_state.pkl')
+    le_dest_state = joblib.load('encodings/le_dest_state.pkl')
+    
+    origin_te = joblib.load('encodings/origin_te.pkl')
+    dest_te = joblib.load('encodings/dest_te.pkl')
+    route_te = joblib.load('encodings/route_te.pkl')
+    
+    origin_hourly_avg = joblib.load('encodings/origin_hourly_avg.pkl')
+    dest_hourly_avg = joblib.load('encodings/dest_hourly_avg.pkl')
+    route_hourly_avg = joblib.load('encodings/route_hourly_avg.pkl')
+    
+    carrier_delay_map = joblib.load('encodings/carrier_delay_map.pkl')
+    origin_delay_map = joblib.load('encodings/origin_delay_map.pkl')
+    dest_delay_map = joblib.load('encodings/dest_delay_map.pkl')
+    route_delay_map = joblib.load('encodings/route_delay_map.pkl')    
+    best_threshold = joblib.load('models/best_threshold.pkl')
+    
+    duration_reg = joblib.load('models/duration_regressor.pkl')
+    
+    return model, df, duration_reg, le_carrier, le_origin_state, le_dest_state, origin_te, dest_te, route_te, origin_hourly_avg, dest_hourly_avg, route_hourly_avg, carrier_delay_map, origin_delay_map, dest_delay_map, route_delay_map, best_threshold, tf
+
+model, df, duration_reg, le_carrier, le_origin_state, le_dest_state, origin_te, dest_te, route_te, origin_hourly_avg, dest_hourly_avg, route_hourly_avg, carrier_delay_map, origin_delay_map, dest_delay_map, route_delay_map, best_threshold, tf = load_items()
 
 def isHolidayPeriod(date):
     if date.month == 1 and 15 <= date.day <= 20:
@@ -109,59 +141,30 @@ def cached_get_departures(origin_iata, from_time, to_time, api_key):
 
 @st.cache_data
 def get_cleaned_airports():
-    airports = pd.read_csv("airports/airports.csv")
-    airports = airports.dropna(subset=["iata_code"])
-    airports = airports[airports["iata_code"] != "None"]
-    return airports
+    airport_data = pd.read_csv('airports/airports.csv')
+    airport_data = airport_data.dropna(subset=['iata_code'])
+    airport_data = airport_data[airport_data['iata_code'] != 'None']
+    airport_data = airport_data[airport_data['iata_code'].isin(df['ORIGIN'].unique())]
+    return airport_data
 
-airports = get_cleaned_airports()
+airport_data = get_cleaned_airports()
 
 @st.cache_data
 def get_sorted_airport_codes():
-    return sorted(airports['iata_code'].tolist())
-
+    return sorted(airport_data['iata_code'].tolist())
 airport_codes = get_sorted_airport_codes()
 
 @st.cache_data
-def get_airport_display_names():
-    return {row['iata_code']: f"{row['iata_code']} - {row['name']}" for _, row in airports.iterrows()}
+def get_airport_display_names():  
+    return {row['iata_code']: f"{row['iata_code']} - {row['name']}" for _, row in airport_data.iterrows()}
 
 airport_names = get_airport_display_names()
 
 @st.cache_data
 def get_airport_timezone(iata_code, _timeZoneFinder):
-    row = airports[airports['iata_code'] == iata_code].iloc[0]
+    row = airport_data[airport_data['iata_code'] == iata_code].iloc[0]
     timezone_str = _timeZoneFinder.timezone_at(lat=row['latitude_deg'], lng=row['longitude_deg'])
     return timezone_str, row['latitude_deg'], row['longitude_deg']
-
-@st.cache_resource
-def load_items():
-    tf = TimezoneFinder()
-    model = joblib.load('models/best_model.pkl')
-    
-    le_carrier = joblib.load('encodings/le_carrier.pkl')
-    le_origin_state = joblib.load('encodings/le_origin_state.pkl')
-    le_dest_state = joblib.load('encodings/le_dest_state.pkl')
-    
-    origin_te = joblib.load('encodings/origin_te.pkl')
-    dest_te = joblib.load('encodings/dest_te.pkl')
-    route_te = joblib.load('encodings/route_te.pkl')
-    
-    origin_hourly_avg = joblib.load('encodings/origin_hourly_avg.pkl')
-    dest_hourly_avg = joblib.load('encodings/dest_hourly_avg.pkl')
-    route_hourly_avg = joblib.load('encodings/route_hourly_avg.pkl')
-    
-    carrier_delay_map = joblib.load('encodings/carrier_delay_map.pkl')
-    origin_delay_map = joblib.load('encodings/origin_delay_map.pkl')
-    dest_delay_map = joblib.load('encodings/dest_delay_map.pkl')
-    route_delay_map = joblib.load('encodings/route_delay_map.pkl')    
-    best_threshold = joblib.load('models/best_threshold.pkl')
-    
-    duration_reg = joblib.load('models/duration_regressor.pkl')
-    
-    return model, duration_reg, le_carrier, le_origin_state, le_dest_state, origin_te, dest_te, route_te, origin_hourly_avg, dest_hourly_avg, route_hourly_avg, carrier_delay_map, origin_delay_map, dest_delay_map, route_delay_map, best_threshold, tf
-
-model, duration_reg, le_carrier, le_origin_state, le_dest_state, origin_te, dest_te, route_te, origin_hourly_avg, dest_hourly_avg, route_hourly_avg, carrier_delay_map, origin_delay_map, dest_delay_map, route_delay_map, best_threshold, tf = load_items()
 
 st.markdown("<h1 style='text-align: center;'>US Flight Delay Predictor</h1>", unsafe_allow_html=True)
 st.markdown("<h3 style='text-align: center;'>Will your flight be delayed?</h3>", unsafe_allow_html=True)
@@ -189,7 +192,7 @@ with col1:
     origin = st.selectbox(
         "Origin",
         options=airport_codes,
-        index=airport_codes.index('AUS'),  
+        index=airport_codes.index('AUS'),
         format_func=lambda x: airport_names.get(x, x)
     )
     
@@ -198,8 +201,6 @@ with col1:
     today_local = datetime.datetime.now(local_tz).date()
     departure_date = st.date_input("Departure Date", min_value=today_local, value=today_local)
 
-    # departure_date = st.date_input("Departure Date", min_value=datetime.date.today(), value=datetime.date.today())
-
 with col2:    
     destination = st.selectbox(
         "Destination",
@@ -207,6 +208,7 @@ with col2:
         index=airport_codes.index('SLC'),
         format_func=lambda x: airport_names.get(x, x)
     )
+    
     airline = st.selectbox(
         "Airline",
         options=['AA', 'AS', 'B6', 'DL', 'F9', 'G4', 'HA', 'MQ', 'NK', 'OH', 'OO', 'UA', 'WN', 'YX'],
@@ -383,11 +385,11 @@ with center_col:
         utc_dt = local_dt_aware.astimezone(pytz.utc)
         utc_hour = utc_dt.hour
             
-        latitude = airports[airports['iata_code'] == origin]['latitude_deg'].values[0]
-        longitude = airports[airports['iata_code'] == origin]['longitude_deg'].values[0]
+        latitude = airport_data[airport_data['iata_code'] == origin]['latitude_deg'].values[0]
+        longitude = airport_data[airport_data['iata_code'] == origin]['longitude_deg'].values[0]
         
-        destination_latitude = airports[airports['iata_code'] == destination]['latitude_deg'].values[0]
-        destination_longitude = airports[airports['iata_code'] == destination]['longitude_deg'].values[0]
+        destination_latitude = airport_data[airport_data['iata_code'] == destination]['latitude_deg'].values[0]
+        destination_longitude = airport_data[airport_data['iata_code'] == destination]['longitude_deg'].values[0]
         
         distance = haversine_distance(latitude, longitude, destination_latitude, destination_longitude)
         
@@ -499,8 +501,8 @@ with center_col:
         DAY_OF_WEEK = departure_date.weekday()
         IS_HOLIDAY_PERIOD = isHolidayPeriod(departure_date)
         
-        origin_state_abr = airports[airports['iata_code'] == origin]['iso_region'].values[0][3:]
-        dest_state_abr = airports[airports['iata_code'] == destination]['iso_region'].values[0][3:]
+        origin_state_abr = airport_data[airport_data['iata_code'] == origin]['iso_region'].values[0][3:]
+        dest_state_abr = airport_data[airport_data['iata_code'] == destination]['iso_region'].values[0][3:]
         
         airline_encoded = le_carrier.transform([airline])[0]
         origin_state_encoded = le_origin_state.transform([origin_state_abr])[0]
