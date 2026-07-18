@@ -461,7 +461,6 @@ with center_col:
                 st.caption("No inbound aircraft data available. Aircraft is likely already at the gate.")
         else:
             st.error("No live flight matching inputted details.")
-            # st.stop()
         
         url = (
             f"{base_url}?"
@@ -533,7 +532,7 @@ with center_col:
             'MONTH': [MONTH],
             'IS_HOLIDAY_PERIOD': [IS_HOLIDAY_PERIOD],
             'DISTANCE': [distance],
-            'CRS_ELAPSED_TIME': [estimated_duration],
+            'CRS_ELAPSED_TIME': [estimate_duration_from_distance(distance)],
             'ORIGIN_STATE_ABR': [origin_state_encoded],
             'DEST_STATE_ABR': [dest_state_encoded],
             'ROUTE_HOURLY_FLIGHTS': [route_hourly_flights],
